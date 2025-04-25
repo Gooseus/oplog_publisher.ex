@@ -1,0 +1,24 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    # Mount the init script to initiate the single‑node replica set
+    volumes:
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    # Enable replica‑set mode and bind on all interfaces
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+
+  nats:
+    image: nats:latest
+    container_name: nats
+    restart: always
+    ports:
+      - "4222:4222"   # client port
+      - "8222:8222"   # monitoring port
+    # Mount a custom server config that turns on JetStream and defines our stream
+    volumes:
+      - ./nats-server.conf:/etc/nats/nats-server.conf:ro
+    command: ["-c", "/etc/nats/nats-server.conf"]
