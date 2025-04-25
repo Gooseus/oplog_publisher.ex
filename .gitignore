@@ -21,3 +21,5 @@ oplog_publisher-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+.resume_token
