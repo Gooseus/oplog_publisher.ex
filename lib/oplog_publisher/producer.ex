@@ -35,6 +35,17 @@ defmodule OplogPublisher.Producer do
   end
 
   @impl true
+  def handle_info(:process_stream, %{cursor: cursor, demand: demand, cont: {:cont, []}} = state) do
+    Logger.info("Processing stream with demand: #{demand}")
+    case StreamStepper.next_item(cursor, {:cont, []}) do
+      {:no_event, new_cont, stream} ->
+        {:noreply, [], %{state | cont: new_cont, cursor: stream}}
+
+      {item, new_cont, stream} ->
+        {:noreply, [wrap_into_broadway_message(item)], %{state | cont: new_cont, cursor: stream}}
+    end
+  end
+
   def handle_info(:process_stream, %{cursor: cursor, demand: demand, cont: cont} = state)
       when demand > 0 do
     Logger.info("Processing stream with demand: #{demand}")
@@ -50,7 +61,10 @@ defmodule OplogPublisher.Producer do
           {:noreply, [], base_state}
 
         messages ->
-          messages = messages |> Enum.map(&wrap_into_broadway_message/1)
+          messages = messages |> Enum.map(fn msg ->
+            save_token(msg)
+            msg
+          end) |> Enum.map(&wrap_into_broadway_message/1)
           remaining = demand - length(messages)
           new_state = %{base_state | demand: remaining}
 
@@ -92,7 +106,7 @@ defmodule OplogPublisher.Producer do
         end
 
       Logger.debug("Setting up watch stream with options: #{inspect(options)}")
-      cursor = Mongo.watch_collection(conn, "users", pipeline, &save_token/1, options)
+      cursor = Mongo.watch_collection(conn, "users", pipeline, nil, options)
       {:ok, cursor}
     rescue
       e ->
@@ -144,6 +158,10 @@ defmodule OplogPublisher.Producer do
   @spec save_token(map()) :: :ok
   defp save_token(%{"_data" => token}) when is_binary(token) do
     save_token(token)
+  end
+
+  defp save_token(%{"_id" => token}= msg) do
+    { save_token(token), msg }
   end
 
   defp load_token do

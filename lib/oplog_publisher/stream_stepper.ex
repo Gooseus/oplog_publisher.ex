@@ -39,14 +39,17 @@ defmodule StreamStepper do
     try do
       # We use reduce/3 directly so we can suspend rather than halt the stream:
       case Enumerable.reduce(stream, cont, fn element, _acc -> {:suspend, [element]} end) do
-        {:suspended, [], _new_cont} ->
-          {:no_event, cont, stream}
+        {:suspended, [], new_cont} ->
+          {:no_event, new_cont, stream}
 
         {:suspended, [nil], new_cont} ->
           {:no_event, new_cont, stream}
 
         {:suspended, [item], new_cont} ->
           {item, new_cont, stream}
+
+        {:done, _} ->
+          {:no_event, cont, stream}
 
         other ->
           raise "Unexpected reduce result: #{inspect(other)}"
