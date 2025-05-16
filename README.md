@@ -55,7 +55,7 @@ services:
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone git@github.com:Gooseus/oplog_publisher.ex.git
 cd oplog_publisher
 ```
 
