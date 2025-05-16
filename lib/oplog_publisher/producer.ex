@@ -42,6 +42,13 @@ defmodule OplogPublisher.Producer do
         {:noreply, [], %{state | cont: new_cont, cursor: stream}}
 
       {item, new_cont, stream} ->
+        # Save the resume token before wrapping the message
+        if token = get_in(item, ["_id", "_data"]) do
+          Logger.debug("Found resume token in message: #{token}")
+          save_token(token)
+        else
+          Logger.warning("No resume token found in message")
+        end
         {:noreply, [wrap_into_broadway_message(item)], %{state | cont: new_cont, cursor: stream}}
     end
   end
@@ -62,9 +69,16 @@ defmodule OplogPublisher.Producer do
 
         messages ->
           messages = messages |> Enum.map(fn msg ->
-            save_token(msg)
-            msg
-          end) |> Enum.map(&wrap_into_broadway_message/1)
+            # Save the resume token from the _id._data field
+            Logger.debug("Processing message: #{inspect(msg, pretty: true)}")
+            if token = get_in(msg, ["_id", "_data"]) do
+              Logger.debug("Found resume token in message: #{token}")
+              save_token(token)
+            else
+              Logger.warning("No resume token found in message")
+            end
+            wrap_into_broadway_message(msg)
+          end)
           remaining = demand - length(messages)
           new_state = %{base_state | demand: remaining}
 
@@ -152,16 +166,8 @@ defmodule OplogPublisher.Producer do
 
   @spec save_token(String.t()) :: :ok
   defp save_token(token_data) when is_binary(token_data) do
+    Logger.debug("Saving resume token: #{token_data}")
     File.write!(".resume_token", :erlang.term_to_binary(token_data))
-  end
-
-  @spec save_token(map()) :: :ok
-  defp save_token(%{"_data" => token}) when is_binary(token) do
-    save_token(token)
-  end
-
-  defp save_token(%{"_id" => token}= msg) do
-    { save_token(token), msg }
   end
 
   defp load_token do

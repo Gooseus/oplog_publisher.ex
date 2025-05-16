@@ -5,3 +5,6 @@ config :oplog_publisher,
   nats_url:  System.get_env("NATS_URL"),
   js_stream: "OPLOG",
   js_subject_prefix: "oplog"
+
+# Import environment specific config
+import_config "#{config_env()}.exs"
