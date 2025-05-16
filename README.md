@@ -2,7 +2,6 @@
 
 A MongoDB oplog publisher that streams changes to NATS.
 
-
 ## Working environment
 
 ### Elixir
@@ -70,11 +69,26 @@ mix deps.get
 docker-compose up -d
 ```
 
-This will start:
-- MongoDB instance
-- NATS server
-
+This will start the MongoDB and NATS containers with the given configurations.
 
 ## Issue
 
+Running `mix test` after starting the docker services should demonstrate the issue, though to watch it in action you can:
 
+1. Run `mix run --no-halt` to start the app
+2. Open a connection to the `oplogtest` database of the Mongo running in docker (i.e. Run `mongosh`)
+3. Run `nats sub "oplog.>"` with the NATS CLI to subscribe to the firehose of oplog events
+
+Everything should be running in an idle state at this point and should run as expected:
+
+1. Create new document in the `users` collection of the `oplogtest` database in Mongo
+2. Observe the app handling the change to the collection and the message received from NATS on the `oplog.oplogtest.users.created` subject.
+3. Any other change operations on the collection should also come through on `oplog.oplogtest.users.<operation>`.
+
+Great. Exit the app and try this:
+
+1. Create new document in the `users` collection of the `oplogtest` database in Mongo
+2. Run `mix run --no-halt` to start the app
+3. Observe an infinite loop in the app and the same message being published repeatedly in NATS
+
+Why?
